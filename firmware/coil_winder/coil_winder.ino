@@ -57,7 +57,7 @@ void loop() {
   TMCstep motdrive0 = TMCstep(D0S0S, D0S0D, Driver0, 0);
   motdrive0.set_run_current(20);
   motdrive0.set_hold_current(5);
-  motdrive0.set_dir(0);
+  motdrive0.set_dir(1);
   motdrive0.disable();
 
   int32_t winds = 0;

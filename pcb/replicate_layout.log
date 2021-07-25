@@ -1,0 +1,78 @@
+07-25 12:37:22 replicate_layout.action_replicate_layout 305:Plugin executed on: 'win32'
+07-25 12:37:22 replicate_layout.action_replicate_layout 306:Plugin executed with python version: '2.7.16 (default, Aug 15 2019, 17:51:40)  [GCC 9.2.0 64 bit (AMD64)]'
+07-25 12:37:22 replicate_layout.action_replicate_layout 307:KiCad build version: (5.1.6)-1
+07-25 12:37:22 replicate_layout.action_replicate_layout 308:Replicate layout plugin version: 70 started
+07-25 12:37:22 replicate_layout.action_replicate_layout 340:Preparing replicator with C18 as a reference
+07-25 12:37:22 replicate_layout.replicatelayout 215:getting project hierarchy from schematics
+07-25 12:37:22 replicate_layout.replicatelayout 217:Project hierarchy looks like:
+{u'60FFED8C': [u'CoilDriver0', u'C:\\Users\\DDeGo\\Documents\\Drew\\Projects\\VariLev\\pcb\\CoilDriver.sch'], u'6110159B': [u'sheet61101593', u'C:\\Users\\DDeGo\\Documents\\Drew\\Projects\\VariLev\\pcb\\CoilDriver.sch']}
+07-25 12:37:22 replicate_layout.replicatelayout 225:getting a list of all footprints on board
+07-25 12:37:22 replicate_layout.action_replicate_layout 367:source anchor footprint is u'C18'
+Located on:[u'CoilDriver0']
+With filenames:[u'CoilDriver.sch']
+With sheet_id:[u'CoilDriver0']
+07-25 12:37:22 replicate_layout.action_replicate_layout 371:Corresponding footprints are 
+[(u'C21', [u'sheet61101593']), (u'C18', [u'CoilDriver0'])]
+07-25 12:37:22 replicate_layout.action_replicate_layout 384:Showing dialog
+07-25 12:37:22 replicate_layout.action_replicate_layout 388:Pcbnew position: wx.Point(-7, 0)
+07-25 12:37:22 replicate_layout.action_replicate_layout 394:Display 0: wx.Rect(0, 0, 3440, 1440)
+07-25 12:37:22 replicate_layout.action_replicate_layout 398:Toolbar position: wx.Point(2205, 123)
+07-25 12:37:22 replicate_layout.action_replicate_layout 405:Dialog position: wx.Point(1892, 123)
+07-25 12:37:24 replicate_layout.replicatelayout 249:construcing a list of sheets suitable for replication on level:u'CoilDriver0', file:u'CoilDriver.sch'
+07-25 12:37:24 replicate_layout.replicatelayout 256:Source sheet path up to the level:[u'CoilDriver0']
+07-25 12:37:24 replicate_layout.replicatelayout 260:Footprints on the sheets:
+[u'C21', u'C18']
+07-25 12:37:24 replicate_layout.replicatelayout 263:Footprints raw sheet ids:
+[u'/6110159B/61057EC2', u'/60FFED8C/61057EC2']
+07-25 12:37:24 replicate_layout.replicatelayout 279:All sheets to replicate:
+[[u'sheet61101593'], [u'CoilDriver0']]
+07-25 12:37:24 replicate_layout.replicatelayout 284:All sheets to replicate sorted:
+[[u'CoilDriver0'], [u'sheet61101593']]
+07-25 12:37:24 replicate_layout.replicatelayout 290:All sheets to replicate sorted and without source sheet:
+[[u'sheet61101593']]
+07-25 12:37:28 replicate_layout.replicatelayout 249:construcing a list of sheets suitable for replication on level:u'CoilDriver0', file:u'CoilDriver.sch'
+07-25 12:37:28 replicate_layout.replicatelayout 256:Source sheet path up to the level:[u'CoilDriver0']
+07-25 12:37:28 replicate_layout.replicatelayout 260:Footprints on the sheets:
+[u'C21', u'C18']
+07-25 12:37:28 replicate_layout.replicatelayout 263:Footprints raw sheet ids:
+[u'/6110159B/61057EC2', u'/60FFED8C/61057EC2']
+07-25 12:37:28 replicate_layout.replicatelayout 279:All sheets to replicate:
+[[u'sheet61101593'], [u'CoilDriver0']]
+07-25 12:37:28 replicate_layout.replicatelayout 284:All sheets to replicate sorted:
+[[u'CoilDriver0'], [u'sheet61101593']]
+07-25 12:37:28 replicate_layout.replicatelayout 290:All sheets to replicate sorted and without source sheet:
+[[u'sheet61101593']]
+07-25 12:37:28 replicate_layout.action_replicate_layout 179:Replicating layout
+07-25 12:37:28 replicate_layout.replicatelayout 994:Starting replication of sheets: [[u'sheet61101593']]
+on level: [u'CoilDriver0']
+with tracks=True, zone=True, text=True, containing=True, remove=False, locked=False
+07-25 12:37:28 root 261:updating GUI message: 'Preparing for replication'
+07-25 12:37:28 root 266:updating GUI with: 0
+07-25 12:37:28 replicate_layout.replicatelayout 556:Getting the list of source footprints
+07-25 12:37:28 replicate_layout.replicatelayout 560:Getting the list of all the remaining footprints
+07-25 12:37:28 replicate_layout.replicatelayout 564:Getting nets local to source footprints
+07-25 12:37:28 replicate_layout.replicatelayout 568:Getting source bounding box
+07-25 12:37:28 root 266:updating GUI with: 37
+07-25 12:37:28 replicate_layout.replicatelayout 572:Getting source tracks
+07-25 12:37:28 replicate_layout.replicatelayout 576:Getting source zones
+07-25 12:37:28 root 266:updating GUI with: 62
+07-25 12:37:28 replicate_layout.replicatelayout 580:Getting source text items
+07-25 12:37:28 replicate_layout.replicatelayout 584:Getting source text items
+07-25 12:37:28 root 261:updating GUI message: 'Replicating footprints'
+07-25 12:37:28 replicate_layout.replicatelayout 590:Replicating footprints
+07-25 12:37:28 replicate_layout.replicatelayout 596:Replicating footprints on sheet [u'sheet61101593']
+07-25 12:37:28 root 266:updating GUI with: 89
+07-25 12:37:28 root 261:updating GUI message: 'Replicating tracks'
+07-25 12:37:28 replicate_layout.replicatelayout 720:Replicating tracks
+07-25 12:37:28 replicate_layout.replicatelayout 726:Replicating tracks on sheet [u'sheet61101593']
+07-25 12:37:28 root 261:updating GUI message: 'Replicating zones'
+07-25 12:37:28 replicate_layout.replicatelayout 771:Replicating zones
+07-25 12:37:28 replicate_layout.replicatelayout 778:Replicating zones on sheet [u'sheet61101593']
+07-25 12:37:28 root 261:updating GUI message: 'Replicating text'
+07-25 12:37:28 root 266:updating GUI with: 0
+07-25 12:37:28 replicate_layout.replicatelayout 837:Replicating text
+07-25 12:37:28 replicate_layout.replicatelayout 844:Replicating text on sheet [u'sheet61101593']
+07-25 12:37:28 root 261:updating GUI message: 'Replicating drawings'
+07-25 12:37:28 replicate_layout.replicatelayout 868:Replicating drawings
+07-25 12:37:28 replicate_layout.replicatelayout 874:Replicating drawings on sheet [u'sheet61101593']
+07-25 12:37:28 replicate_layout.action_replicate_layout 201:Replication complete
