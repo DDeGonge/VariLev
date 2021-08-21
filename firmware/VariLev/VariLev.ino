@@ -1,117 +1,72 @@
 #include "coilBase.h"
 #include "pins.h"
 
-
 void setup() {
+  delay(200);
   Serial.begin(250000);
   while(!Serial);
 }
 
 void loop() {
+  delay(100);
   Serial.println("INITIALIZING");
-  // x-, x+, y-, y+
-  Coil coils[4] = {Coil(coil2), Coil(coil0), Coil(coil3), Coil(coil1)};
+  // (x-, x+, y-, y+)
+  Coil coils[4] = {
+    Coil(coil1_DIR, coil1_EN, false),
+    Coil(coil3_DIR, coil3_EN, true),
+    Coil(coil2_DIR, coil2_EN, false),
+    Coil(coil0_DIR, coil0_EN, true)
+  };
 
   Tlv493d MagSensor = Tlv493d();
   MagSensor.begin();
-  Serial.println("SENSOR STARTED");
-//  MagSensor.setAccessMode(MagSensor.FASTMODE);
   MagSensor.setAccessMode(MagSensor.LOWPOWERMODE);
   MagSensor.disableTemp();
+  Serial.println("SENSOR STARTED");
 
-
-  // STATIC TEST
+  // DEBUG TESTS
 //  while(true)
 //  {
-//    for (int c = 0; c < 4; c++)
-//    {
-//      coils[c].set_power(255);
-//    }
-//    Serial.println("on");
-//    delay(2000);
-//    Serial.println("off");
-//    for (int c = 0; c < 4; c++)
-//    {
-//      coils[c].set_power(0);
-//    }
-//    delay(2000);
-//  }
-
-  double mag_x, mag_y, mag_z;
-  while(true)
-  {
-    coils[0].set_power(0);
-    coils[1].set_power(0);
-    coils[2].set_power(255);
-    coils[3].set_power(0);
-    for (int i = 0; i < 1000; i++)
-    {
-      MagSensor.updateData();
-      mag_x = MagSensor.getX();
-      mag_y = MagSensor.getY();
-      mag_z = MagSensor.getZ();
-    
-      Serial.print(mag_x);
-      Serial.print("\t ; ");
-      Serial.print(mag_y);
-      Serial.print("\t ; ");
-      Serial.println(mag_z);
-    }
-    coils[0].set_power(255);
-    coils[1].set_power(0);
-    coils[2].set_power(0);
-    coils[3].set_power(0);
-    for (int i = 0; i < 1000; i++)
-    {
-      MagSensor.updateData();
-      mag_x = MagSensor.getX();
-      mag_y = MagSensor.getY();
-      mag_z = MagSensor.getZ();
-    
-      Serial.print(mag_x);
-      Serial.print("\t ; ");
-      Serial.print(mag_y);
-      Serial.print("\t ; ");
-      Serial.println(mag_z);
-    }
-  }
-  
-  // RAMP TEST
-//  while(true)
-//  {
-//    int ramp_min = 180;
-//    int dwell = 100;
-//    for (int i = ramp_min; i < 255; i++)
-//    {
-//      coils[0].set_power(i);
-//      coils[1].set_power(ramp_min + (255 - i));
-//      Serial.println(i);
-//      delay(dwell);
-//    }
-//    for (int i = 255; i > ramp_min; i--)
-//    {
-//      coils[0].set_power(i);
-//      coils[1].set_power(ramp_min + (255 - i));
-//      Serial.println(i);
-//      delay(dwell);
-//    }
+//      print_mag(MagSensor);
+//    ramp_test(coils);
+//    cycle_all(coils);
 //  }
 
   // Calibrate coils
-//  Serial.println("CALIBRATING");
-//  for (int c = 0; c < 4; c++)
-//  {
-//    coils[c].run_cal(MagSensor, 0.2);
-//  }
+  Serial.println("CALIBRATING");
+  for (int c = 0; c < 4; c++)
+  {
+    coils[c].run_cal(MagSensor, 0.1);
+  }
 
   VariLev LevObj = VariLev(coils);
   LevObj.enable_controllers();
-  LevObj.set_mags_target(-1.0, 0.0, 100.0);
+  LevObj.set_mags_target(0.0, 0.0, 100.0);
 
-//  double mag_x, mag_y, mag_z;
+  double mag_x, mag_y, mag_z;
+  double kp, ki, kv;
+  char serial_data[MAX_MSG_LEN];
 
   while(true)
   {
+    while(Serial.available() > 0)
+    {
+      kp = (double)Serial.parseFloat();
+      ki = (double)Serial.parseFloat();
+      kv = (double)Serial.parseFloat();
+      char r = Serial.read();
+      if(r == '\n'){}
+    
+      Serial.print("kp =  ");
+      Serial.println(kp);
+      Serial.print("ki =  ");
+      Serial.println(ki);
+      Serial.print("kv =  ");
+      Serial.println(kv);
+
+      LevObj.update_xy_tuning(kp, ki, kv);
+    }
+      
     delay(MagSensor.getMeasurementDelay());
     MagSensor.updateData();
     mag_x = MagSensor.getX();
@@ -124,5 +79,48 @@ void loop() {
     Serial.print("\t ; ");
     Serial.println(mag_z);
     LevObj.update_current_mags(mag_x, mag_y, mag_z);
+  }
+}
+
+void print_mag(Tlv493d MagSensor)
+{
+  delay(MagSensor.getMeasurementDelay());
+  MagSensor.updateData();
+
+  Serial.print(MagSensor.getX());
+  Serial.print("\t ; ");
+  Serial.print(MagSensor.getY());
+  Serial.print("\t ; ");
+  Serial.println(MagSensor.getZ());
+}
+
+void ramp_test(Coil dacoils[4])
+{
+  int ramp_min = 180;
+  int dwell = 100;
+  for (int i = ramp_min; i < 255; i++)
+  {
+    dacoils[0].set_power(i);
+    dacoils[1].set_power(ramp_min + (255 - i));
+    Serial.println(i);
+    delay(dwell);
+  }
+  for (int i = 255; i > ramp_min; i--)
+  {
+    dacoils[0].set_power(i);
+    dacoils[1].set_power(ramp_min + (255 - i));
+    Serial.println(i);
+    delay(dwell);
+  }
+}
+
+void cycle_all(Coil dacoils[4])
+{
+  for (int c = 0; c < 4; c++)
+  {
+    Serial.println(c);
+    dacoils[c].set_power(255);
+    delay(1000);
+    dacoils[c].set_power(0);
   }
 }
