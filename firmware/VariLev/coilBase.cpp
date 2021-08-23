@@ -1,20 +1,21 @@
 #include "coilBase.h"
 
-Coil::Coil(unsigned int dirPin, unsigned int enPin, bool invert_flag)
+Coil::Coil(unsigned int dirPin0, unsigned int enPin0, unsigned int dirPin1, unsigned int enPin1, bool invert0, bool invert1)
 {
-  if (invert_flag)  invert = -1;
-  else              invert =  1;
+  flip0 = invert0;
+  flip1 = invert1;
   
-  set_pins(dirPin, enPin);
+  set_pins(dirPin0, enPin0, dirPin1, enPin1);
   set_power(0);
 }
 
 bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
 {
   // First find neutral field strength (when electromagnet is off)
-  float delaytime_ms = MagSensor.getMeasurementDelay();
+  float delaytime_ms = 1000 / CYCLEFREQ;
+  int samples = int(0.1 * CYCLEFREQ);
   float xmeasured = 0, ymeasured = 0, zmeasured = 0;
-  for (int s = 0; s < 100; s++)
+  for (int s = 0; s < samples; s++)
   {
     MagSensor.updateData();
     xmeasured += MagSensor.getX();
@@ -22,9 +23,9 @@ bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
     zmeasured += MagSensor.getZ();
     delay(delaytime_ms);
   }
-  float x_zero = xmeasured / 100;
-  float y_zero = ymeasured / 100;
-  float z_zero = zmeasured / 100;
+  float x_zero = xmeasured / samples;
+  float y_zero = ymeasured / samples;
+  float z_zero = zmeasured / samples;
 
   // Then run all testpoints
   for (int i = 0; i < (sizeof(cal_powers) / sizeof(cal_powers[0])); i++)
@@ -32,7 +33,7 @@ bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
     set_power(cal_powers[i]);
     delay(5);
     int t_start = millis();
-    int samples = (int)(caltime_s * (1000 / delaytime_ms));
+    int samples = (int)(caltime_s * CYCLEFREQ);
     float xmeasured = 0, ymeasured = 0, zmeasured = 0;
     for (int s = 0; s < samples; s++)
     {
@@ -47,6 +48,8 @@ bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
     zcal[i] = zmeasured / samples;
     Serial.print("CalStep: ");
     Serial.print(i);
+    Serial.print(": ");
+    Serial.print(cal_powers[i]);
     Serial.print("\t");
     Serial.print(xcal[i]);
     Serial.print(" ");
@@ -59,18 +62,21 @@ bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
   return true;
 }
 
-bool Coil::set_pins(unsigned int dirPin, unsigned int enPin)
+bool Coil::set_pins(unsigned int dirPin0, unsigned int enPin0, unsigned int dirPin1, unsigned int enPin1)
 {
-  dir_pin = dirPin;
-  en_pin = enPin;
-  pinMode(dir_pin, OUTPUT);
-  pinMode(en_pin, OUTPUT);
+  dir_pin0 = dirPin0;
+  en_pin0 = enPin0;
+  dir_pin1 = dirPin1;
+  en_pin1 = enPin1;
+  pinMode(dir_pin0, OUTPUT);
+  pinMode(en_pin0, OUTPUT);
+  pinMode(dir_pin1, OUTPUT);
+  pinMode(en_pin1, OUTPUT);
   return true;
 }
 
 bool Coil::set_power(int power)
 {
-  power *= invert;
   if ((power < -255) || (power > 255))
   {
     Serial.print("WARN, invalid power value :");
@@ -80,24 +86,27 @@ bool Coil::set_power(int power)
   else if (power == 0)
   {
     coil_power = 0;
-    analogWrite(en_pin, 0);
+    analogWrite(en_pin0, 0);
+    analogWrite(en_pin1, 0);
     return true;
   }
-  else if (power < 0)
+  else
   {
     coil_power = power;
-    digitalWrite(dir_pin, LOW);
-    analogWrite(en_pin, -power);
+    bool dir0 = flip0 ? LOW : HIGH;
+    bool dir1 = flip1 ? HIGH : LOW;
+    if (power < 0)
+    {
+      dir0 = !dir0;
+      dir1 = !dir1;
+      power *= -1;
+    }
+    digitalWrite(dir_pin0, dir0);
+    digitalWrite(dir_pin1, dir1);
+    analogWrite(en_pin0, power);
+    analogWrite(en_pin1, power);
     return true;
   }
-  else if (power > 0)
-  {
-    coil_power = power;
-    digitalWrite(dir_pin, HIGH);
-    analogWrite(en_pin, power);
-    return true;
-  }
-  else return false;
 }
 
 bool Coil::get_distortion(double &x, double &y, double &z)
@@ -142,19 +151,18 @@ bool Coil::get_distortion(double &x, double &y, double &z)
 VariLev::VariLev(Coil coils[4])
 {
  // Initialize coils
- coil_xn = coils[0];
- coil_xp = coils[1];
- coil_yn = coils[2];
- coil_yp = coils[3];
+ coil_x = coils[0];
+ coil_y = coils[1];
 
  // Configure some PID controller stuff
  x_controller.SetOutputLimits(-1.0, 1.0);
  y_controller.SetOutputLimits(-1.0, 1.0);
  z_controller.SetOutputLimits(0, 1.0);
 
- x_controller.SetSampleTime(10);
- y_controller.SetSampleTime(10);
- z_controller.SetSampleTime(10);
+ int sampletime = int(1000 / CYCLEFREQ);
+ x_controller.SetSampleTime(sampletime);
+ y_controller.SetSampleTime(sampletime);
+ z_controller.SetSampleTime(sampletime);
 
  x_controller.Start(0, 0, 0);
  y_controller.Start(0, 0, 0);
@@ -164,19 +172,17 @@ VariLev::VariLev(Coil coils[4])
 bool VariLev::update_current_mags(double x, double y, double z)
 {
   // Compensate for current coil outputs
-  coil_xn.get_distortion(x, y, z);
-  coil_xp.get_distortion(x, y, z);
-  coil_yn.get_distortion(x, y, z);
-  coil_yp.get_distortion(x, y, z);
+  coil_x.get_distortion(x, y, z);
+  coil_y.get_distortion(x, y, z);
 
   // DEBUGGING
-  Serial.print("CAL OUTPUTS: \t");
-  Serial.print("\tX:");
-  Serial.print(x);
-  Serial.print("\tY:");
-  Serial.print(y);
-  Serial.print("\tZ:");
-  Serial.println(z);
+//  Serial.print("CAL OUTPUTS: \t");
+//  Serial.print("\tX:");
+//  Serial.print(x);
+//  Serial.print("\tY:");
+//  Serial.print(y);
+//  Serial.print("\tZ:");
+//  Serial.println(z);
 
   // Normalize
   double fieldTotal = pow(pow(x, 2) + pow(y, 2) + pow(z, 2), 0.5);
@@ -184,11 +190,11 @@ bool VariLev::update_current_mags(double x, double y, double z)
   double yn = y; // / fieldTotal;
 
   // DEBUGGING
-  Serial.print("NORMALIZED: \t");
-  Serial.print("\tX:");
-  Serial.print(xn);
-  Serial.print("\tY:");
-  Serial.println(yn);
+//  Serial.print("NORMALIZED: \t");
+//  Serial.print("\tX:");
+//  Serial.print(xn);
+//  Serial.print("\tY:");
+//  Serial.println(yn);
 
   // Update positions with LPF
   x_position += lpf_mult * (xn - x_position);
@@ -198,17 +204,20 @@ bool VariLev::update_current_mags(double x, double y, double z)
   z_position += lpf_mult * (new_z_mm - z_position);
 
   // Debug print
-  Serial.print("COMMANDS: \t");
-  Serial.print(x_position);
-  Serial.print("\t ; ");
-  Serial.print(y_position);
-  Serial.print("\t ; ");
-  Serial.println(z_position);
+//  Serial.print("COMMANDS: \t");
+//  Serial.print(x_position);
+//  Serial.print("\t ; ");
+//  Serial.print(y_position);
+//  Serial.print("\t ; ");
+//  Serial.println(z_position);
 
   // Do the control loop stuff
-  x_power = x_controller.Run(x_position);
-  y_power = y_controller.Run(y_position);
-  z_power = z_controller.Run(z_position);
+  x_power += out_lpf_mult * (x_controller.Run(x_position) - x_power);
+  y_power += out_lpf_mult * (y_controller.Run(y_position) - y_power);
+  z_power += out_lpf_mult * (z_controller.Run(z_position) - z_power);
+//  x_power = x_controller.Run(x_position);
+//  y_power = y_controller.Run(y_position);
+//  z_power = z_controller.Run(z_position);
   update_outputs();
   
   return true;
@@ -252,17 +261,28 @@ bool VariLev::disable_controllers()
 bool VariLev::update_outputs()
 {
   // TODO handle Z somehow
-  coil_xp.set_power((int)(x_power * 255));
-  coil_xn.set_power((int)(x_power * -255));
-  coil_yp.set_power((int)(y_power * 255));
-  coil_yn.set_power((int)(y_power * -255));
+  coil_x.set_power((int)(x_power * 255));
+  coil_y.set_power((int)(y_power * 255));
 
-   // DEBUGGING ONLY
-   Serial.print("xpow: ");
-   Serial.print(x_power);
-   Serial.print("\typow: ");
-   Serial.println(y_power);
-   return true;
+ // DEBUGGING ONLY
+// Serial.print("X:");
+// Serial.print(x_power);
+// Serial.print("\tkp:");
+// Serial.print(x_controller.GetLastP(), 3);
+// Serial.print("\tki:");
+// Serial.print(x_controller.GetLastI(), 3);
+// Serial.print("\tkd:");
+// Serial.println(x_controller.GetLastD(), 3);
+
+// Serial.print("Y: ");
+// Serial.print(y_power);
+// Serial.print("  \tkp: ");
+// Serial.print(y_controller.GetLastP(), 3);
+// Serial.print("\tki: ");
+// Serial.print(y_controller.GetLastI(), 3);
+// Serial.print("\tkd: ");
+// Serial.println(y_controller.GetLastD(), 3);
+ return true;
 }
 
 bool VariLev::z_mag_to_mm(double zmag, double &zdist)

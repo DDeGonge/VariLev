@@ -2,32 +2,32 @@
 #include <Arduino.h>
 #include <Tlv493d.h>
 
-#define MAX_MSG_LEN 100
+#define CYCLEFREQ 1000 // 250 1000
 
 struct Coil
 {
   Coil() {};
-  Coil(unsigned int negpin, unsigned int pospin, bool invert_flag);
+  Coil(unsigned int dirPin0, unsigned int enPin0, unsigned int dirPin1, unsigned int enPin1, bool invert0, bool invert1);
 
   public:
   bool run_cal(Tlv493d &MagSensor, float caltime_s);
-  bool set_pins(unsigned int negpin, unsigned int pospin);
+  bool set_pins(unsigned int dirPin0, unsigned int enPin0, unsigned int dirPin1, unsigned int enPin1);
   bool set_power(int power);
   bool get_distortion(double &x, double &y, double &z);
 
   private:
-  unsigned int dir_pin, en_pin;
-  int invert = 1;
+  unsigned int dir_pin0, dir_pin1, en_pin0, en_pin1;
+  int flip0 = false, flip1 = false;
   int coil_power = 0;
-  int cal_powers[15] = {-255, -225, -195, -165, -135, -105, -50, 0, 50, 105, 135, 165, 195, 225, 255};
-  double xcal[15], ycal[15], zcal[15];
+  int cal_powers[17] = {-255, -225, -195, -165, -135, -105, -65, 30, 0, 30, 65, 105, 135, 165, 195, 225, 255};
+  double xcal[17], ycal[17], zcal[17];
   bool calibrated = false;
   
 };
 
 struct VariLev
 {
-  VariLev(Coil coils[4]);
+  VariLev(Coil coils[2]);
   
   public:
   
@@ -47,7 +47,7 @@ struct VariLev
   bool calculate_pwm(double percent, unsigned int &pwm_neg, unsigned int &pwm_pos);
   bool z_mag_to_mm(double zmag, double &zdist);
   
-  Coil coil_xn, coil_xp, coil_yn, coil_yp;
+  Coil coil_x, coil_y;
   
   double x_position = 0;
   double y_position = 0;
@@ -60,9 +60,10 @@ struct VariLev
   // Constants - Maybe move these...?
   unsigned int pwm_min = 50;
   unsigned int pwm_max = 255;
-  double lpf_mult = 1.0;  // Sensor is 100hz, so desired lpf frequency / 100 = lpf_mult
-  double x_kp = 0.2, x_ki = 0.0, x_kd = 0.0;
-  double y_kp = 0.2, y_ki = 0.0, y_kd = 0.0;
+  double lpf_mult = 400.0 / CYCLEFREQ;  // Sensor is 100hz, so desired lpf frequency / 100 = lpf_mult
+  double out_lpf_mult = 1.0; // 200.0 / CYCLEFREQ;
+  double x_kp = 0.1, x_ki = 0.0, x_kd = 0.0;
+  double y_kp = 0.1, y_ki = 0.0, y_kd = 0.0;
   double z_kp = 0.02, z_ki = 0.0, z_kd = 0.0;
 
   // PID Controllers
