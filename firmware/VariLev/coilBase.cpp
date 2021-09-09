@@ -12,8 +12,8 @@ Coil::Coil(unsigned int dirPin0, unsigned int enPin0, unsigned int dirPin1, unsi
 bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
 {
   // First find neutral field strength (when electromagnet is off)
-  float delaytime_ms = 1000 / CYCLEFREQ;
-  int samples = int(0.1 * CYCLEFREQ);
+  float delaytime_ms = 1000 / SENSORFREQ;
+  int samples = int(0.1 * SENSORFREQ);
   float xmeasured = 0, ymeasured = 0, zmeasured = 0;
   for (int s = 0; s < samples; s++)
   {
@@ -33,7 +33,7 @@ bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
     set_power(cal_powers[i]);
     delay(5);
     int t_start = millis();
-    int samples = (int)(caltime_s * CYCLEFREQ);
+    int samples = (int)(caltime_s * SENSORFREQ);
     float xmeasured = 0, ymeasured = 0, zmeasured = 0;
     for (int s = 0; s < samples; s++)
     {
@@ -43,9 +43,10 @@ bool Coil::run_cal(Tlv493d &MagSensor, float caltime_s)
       zmeasured += (MagSensor.getZ() - z_zero);
       delay(delaytime_ms);
     }
-    xcal[i] = xmeasured / samples;
-    ycal[i] = ymeasured / samples;
-    zcal[i] = zmeasured / samples;
+    float multiplier = 1.0;
+    xcal[i] = multiplier * xmeasured / samples;
+    ycal[i] = multiplier * ymeasured / samples;
+    zcal[i] = multiplier * zmeasured / samples;
     Serial.print("CalStep: ");
     Serial.print(i);
     Serial.print(": ");
@@ -111,6 +112,7 @@ bool Coil::set_power(int power)
 
 bool Coil::get_distortion(double &x, double &y, double &z)
 {
+  double xd_new, yd_new, zd_new;
   if (!calibrated)
   {
     Serial.println("ERROR: No calibration. Can't get distortion");
@@ -129,22 +131,29 @@ bool Coil::get_distortion(double &x, double &y, double &z)
   }
   if (l_index == -1)
   {
-    x -= xcal[0];
-    y -= ycal[0];
-    z -= zcal[0];
+    xd_new = xcal[0];
+    yd_new = ycal[0];
+    zd_new = zcal[0];
   }
   else if (l_index >= 0)
   {
     float interp_percent = coil_power - cal_powers[l_index];
     interp_percent /= (cal_powers[l_index + 1] - cal_powers[l_index]);
-    x -= xcal[l_index] + interp_percent * (xcal[l_index + 1] - xcal[l_index]);
-    y -= ycal[l_index] + interp_percent * (ycal[l_index + 1] - ycal[l_index]);
-    z -= zcal[l_index] + interp_percent * (zcal[l_index + 1] - zcal[l_index]);
+    xd_new = xcal[l_index] + interp_percent * (xcal[l_index + 1] - xcal[l_index]);
+    yd_new = ycal[l_index] + interp_percent * (ycal[l_index + 1] - ycal[l_index]);
+    zd_new = zcal[l_index] + interp_percent * (zcal[l_index + 1] - zcal[l_index]);
   }
   else
   {
     return false;
   }
+  xdist += lpf_cal * (xd_new - xdist);
+  ydist += lpf_cal * (yd_new - ydist);
+  zdist += lpf_cal * (zd_new - zdist);
+
+  x -= xdist;
+  y -= ydist;
+  z -= zdist;
   return true;
 }
 
@@ -159,7 +168,7 @@ VariLev::VariLev(Coil coils[4])
  y_controller.SetOutputLimits(-1.0, 1.0);
  z_controller.SetOutputLimits(0, 1.0);
 
- int sampletime = int(1000 / CYCLEFREQ);
+ int sampletime = int(1000000 / CYCLEFREQ);
  x_controller.SetSampleTime(sampletime);
  y_controller.SetSampleTime(sampletime);
  z_controller.SetSampleTime(sampletime);
@@ -169,39 +178,90 @@ VariLev::VariLev(Coil coils[4])
  z_controller.Start(0, 0, 20);
 }
 
+//double VariLev::input_correction(double pos)
+//{
+//  double abspos = abs(pos);
+//  int sign = pos / abspos;
+//  if (abspos < 1.0)
+//  {
+//    return (1.0 * sign * abspos);
+//  }
+//  else
+//  {
+//    return (sign * (2 * sqrt(abspos) - 1));
+//  }
+//}
+
+double VariLev::input_correction(double pos)
+{
+  double abspos = abs(pos);
+  int sign = pos / abspos;
+  if (abspos < 0.63)
+  {
+    return (1.0 * sign * pow(abspos, 2));
+  }
+  else
+  {
+    return (sign * (2 * sqrt(abspos) - 1.19));
+  }
+}
+
+void VariLev::tip_correction(double &xtc, double &ytc)
+{
+  double xgoal = pow(x_power, 2) * deflection_mult;
+  xgoal = fmax(fmin(xgoal, deflection_max), -deflection_max);
+  double xchange = fmin(abs(xgoal - xDeflect), maxTipDelta);
+  if (xDeflect < xgoal) xDeflect += xchange;
+  else if (xDeflect > xgoal) xDeflect -= xchange;
+
+  double ygoal = pow(y_power, 2) * deflection_mult;
+  ygoal = fmax(fmin(ygoal, deflection_max), -deflection_max);
+  double ychange = fmin(abs(ygoal - yDeflect), maxTipDelta);
+  if (yDeflect < ygoal) yDeflect += ychange;
+  else if (yDeflect > ygoal) yDeflect -= ychange;
+
+  xtc -= xDeflect;
+  ytc -= yDeflect;
+}
+
+void VariLev::update_tip_parameters(double rise, double powmult, double maxpow)
+{
+  risetime_s = rise;
+  deflection_max = maxpow;
+  deflection_mult = powmult;
+  maxTipDelta = deflection_max / (risetime_s * SENSORFREQ);
+}
+
 bool VariLev::update_current_mags(double x, double y, double z)
 {
+//  if (DEBUGPRINT)
+//  {
+//    Serial.print("pre-dist:");
+//    Serial.print(x);
+//  }
   // Compensate for current coil outputs
-  coil_x.get_distortion(x, y, z);
-  coil_y.get_distortion(x, y, z);
+  double ynull = 0, xnull = 0;
+  coil_x.get_distortion(x, ynull, z);
+  coil_y.get_distortion(xnull, y, z);
 
-  // DEBUGGING
-//  Serial.print("CAL OUTPUTS: \t");
-//  Serial.print("\tX:");
-//  Serial.print(x);
-//  Serial.print("\tY:");
-//  Serial.print(y);
-//  Serial.print("\tZ:");
-//  Serial.println(z);
+//  if (DEBUGPRINT)
+//  {
+//    Serial.print("\tpost-dist:");
+//    Serial.print(x);
+//  }
+
+//  tip_correction(x, y);
 
   // Normalize
-  double fieldTotal = pow(pow(x, 2) + pow(y, 2) + pow(z, 2), 0.5);
-  double xn = x; // / fieldTotal;
-  double yn = y; // / fieldTotal;
-
-  // DEBUGGING
-//  Serial.print("NORMALIZED: \t");
-//  Serial.print("\tX:");
-//  Serial.print(xn);
-//  Serial.print("\tY:");
-//  Serial.println(yn);
+  double xn = x; // input_correction(x);
+  double yn = y; // input_correction(y);
 
   // Update positions with LPF
   x_position += lpf_mult * (xn - x_position);
   y_position += lpf_mult * (yn - y_position);
-  double new_z_mm;
-  z_mag_to_mm(z, new_z_mm);
-  z_position += lpf_mult * (new_z_mm - z_position);
+//  double new_z_mm;
+//  z_mag_to_mm(z, new_z_mm);
+//  z_position += lpf_mult * (new_z_mm - z_position);
 
   // Debug print
 //  Serial.print("COMMANDS: \t");
@@ -212,14 +272,15 @@ bool VariLev::update_current_mags(double x, double y, double z)
 //  Serial.println(z_position);
 
   // Do the control loop stuff
-  x_power += out_lpf_mult * (x_controller.Run(x_position) - x_power);
-  y_power += out_lpf_mult * (y_controller.Run(y_position) - y_power);
-  z_power += out_lpf_mult * (z_controller.Run(z_position) - z_power);
-//  x_power = x_controller.Run(x_position);
-//  y_power = y_controller.Run(y_position);
-//  z_power = z_controller.Run(z_position);
+  double new_x_power = x_controller.Run(x_position);
+  double new_y_power = y_controller.Run(y_position);
+//  double new_z_power = z_controller.Run(z_position);
+
+  // idk if this will help or not
+  x_power = (fabs(new_x_power) / new_x_power) * sqrt(fabs(new_x_power));
+  y_power = (fabs(new_y_power) / new_y_power) * sqrt(fabs(new_y_power));
   update_outputs();
-  
+
   return true;
 }
 
@@ -264,24 +325,22 @@ bool VariLev::update_outputs()
   coil_x.set_power((int)(x_power * 255));
   coil_y.set_power((int)(y_power * 255));
 
- // DEBUGGING ONLY
-// Serial.print("X:");
-// Serial.print(x_power);
-// Serial.print("\tkp:");
-// Serial.print(x_controller.GetLastP(), 3);
-// Serial.print("\tki:");
-// Serial.print(x_controller.GetLastI(), 3);
-// Serial.print("\tkd:");
-// Serial.println(x_controller.GetLastD(), 3);
-
-// Serial.print("Y: ");
-// Serial.print(y_power);
-// Serial.print("  \tkp: ");
-// Serial.print(y_controller.GetLastP(), 3);
-// Serial.print("\tki: ");
-// Serial.print(y_controller.GetLastI(), 3);
-// Serial.print("\tkd: ");
-// Serial.println(y_controller.GetLastD(), 3);
+ if (DEBUGPRINT)
+ {
+   Serial.print("\tposition:");
+   Serial.print(x_position);
+   Serial.print("\tpower:");
+   Serial.print(x_power);
+   Serial.print("\tdeflect:");
+   Serial.print(xDeflect);
+   Serial.print("\tkp:");
+   Serial.print(x_controller.GetLastP(), 3);
+   Serial.print("\tki:");
+   Serial.print(x_controller.GetLastI(), 3);
+   Serial.print("\tkd:");
+   Serial.print(x_controller.GetLastD(), 3);
+   Serial.println();
+ }
  return true;
 }
 

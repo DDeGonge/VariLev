@@ -3,7 +3,7 @@
 
 void setup() {
   delay(200);
-  Serial.begin(250000);
+  Serial.begin(1000000);
 //  attachInterrupt(13, printtime, FALLING);  // INTERRUPT ON SCL
   while(!Serial);
 }
@@ -25,19 +25,21 @@ void loop() {
 //  MagSensor.enableInterrupt();
   Serial.println("SENSOR STARTED");
 
-  // DEBUG TESTS
+//  delay(500);
+//  coils[0].set_power(255);
+//  // DEBUG TESTS
 //  while(true)
 //  {
 //    print_mag(MagSensor);
-//    ramp_test(coils);
-//    cycle_all(coils);
+////    ramp_test(coils);
+////    cycle_all(coils);
 //  }
 
   // Calibrate coils
   Serial.println("CALIBRATING");
   for (int c = 0; c < 2; c++)
   {
-    coils[c].run_cal(MagSensor, 0.1);
+    coils[c].run_cal(MagSensor, 0.2);
   }
 
   VariLev LevObj = VariLev(coils);
@@ -45,8 +47,8 @@ void loop() {
   LevObj.set_mags_target(0.0, 0.0, 100.0);
 
   double mag_x, mag_y, mag_z;
-  double kp, ki, kv;
-  int measureDelayus = (int)(1000000 / CYCLEFREQ);
+  double kp, ki, kv, rt, dmult, dmax;
+  int measureDelayus = (int)(1000000 / SENSORFREQ);
   long nextMeasureTime = micros() + measureDelayus;
 
   while(true)
@@ -56,6 +58,9 @@ void loop() {
       kp = (double)Serial.parseFloat();
       ki = (double)Serial.parseFloat();
       kv = (double)Serial.parseFloat();
+      rt = (double)Serial.parseFloat();
+      dmult = (double)Serial.parseFloat();
+      dmax = (double)Serial.parseFloat();
       char r = Serial.read();
       if(r == '\n'){}
     
@@ -67,6 +72,7 @@ void loop() {
       Serial.println(kv, 3);
 
       LevObj.update_xy_tuning(kp, ki, kv);
+      LevObj.update_tip_parameters(rt, dmult, dmax);
       nextMeasureTime = micros() + measureDelayus;
     }
 
@@ -99,9 +105,13 @@ void print_mag(Tlv493d MagSensor)
 //  delay(MagSensor.getMeasurementDelay());
   MagSensor.updateData();
 
+  Serial.print("T:");
   Serial.print(micros());
   Serial.print("\t");
-  Serial.println(MagSensor.getX());
+  Serial.print("X:");
+  Serial.print(MagSensor.getX());
+  Serial.print(",Y:");
+  Serial.println(MagSensor.getY());
 
 //  Serial.print(MagSensor.getX());
 //  Serial.print("\t ; ");
